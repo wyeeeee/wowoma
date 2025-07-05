@@ -2,14 +2,18 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from verification_views import VerificationView
+from logger import get_logger
+
+logger = get_logger('commands')
 
 class VerificationCommands(commands.Cog):
     def __init__(self, bot, config_manager):
         self.bot = bot
         self.config_manager = config_manager
     
-    @app_commands.command(name="验证面板", description="创建验证面板")
-    async def verification_panel(self, interaction: discord.Interaction):
+    @app_commands.command(name="验证面板", description="在指定频道创建验证面板")
+    @app_commands.describe(频道="选择要发送验证面板的频道")
+    async def verification_panel(self, interaction: discord.Interaction, 频道: discord.TextChannel):
         """创建验证面板"""
         user_roles = [role.id for role in interaction.user.roles]
         if not self.config_manager.is_admin(user_roles, interaction.guild.id):
@@ -21,6 +25,12 @@ class VerificationCommands(commands.Cog):
             await interaction.response.send_message('❌ 请先使用 `/设置` 命令完成配置！', ephemeral=True)
             return
         
+        # 检查机器人是否有权限在目标频道发送消息
+        if not 频道.permissions_for(interaction.guild.me).send_messages:
+            await interaction.response.send_message(f'❌ 机器人没有在 {频道.mention} 发送消息的权限！', ephemeral=True)
+            return
+        
+        # 创建验证面板
         embed = discord.Embed(
             title='🔐 身份验证',
             description='欢迎来到我们的服务器！\n\n点击下方按钮申请验证，管理员将会审核你的申请。',
@@ -33,7 +43,23 @@ class VerificationCommands(commands.Cog):
         )
         
         view = VerificationView(self.config_manager, self.bot)
-        await interaction.response.send_message(embed=embed, view=view)
+        
+        try:
+            # 在指定频道发送验证面板
+            await 频道.send(embed=embed, view=view)
+            
+            # 记录日志
+            logger.info(f"验证面板创建: {interaction.user} 在 {频道.name} 创建了验证面板")
+            
+            # 回复操作成功
+            await interaction.response.send_message(f'✅ 验证面板已在 {频道.mention} 创建成功！', ephemeral=True)
+            
+        except discord.Forbidden:
+            logger.warning(f"权限不足: 无法在频道 {频道.name} 发送验证面板")
+            await interaction.response.send_message(f'❌ 机器人没有权限在 {频道.mention} 发送消息！', ephemeral=True)
+        except Exception as e:
+            logger.error(f"创建验证面板失败: {e}")
+            await interaction.response.send_message(f'❌ 创建验证面板失败: {str(e)}', ephemeral=True)
     
     @app_commands.command(name="设置", description="设置验证系统配置")
     @app_commands.describe(
@@ -80,6 +106,10 @@ class VerificationCommands(commands.Cog):
         success = self.config_manager.set_server_config(interaction.guild.id, **config_data)
         
         if success:
+            # 记录日志
+            admin_info = f" 管理员身份组:{管理员身份组.name}" if 管理员身份组 else ""
+            logger.info(f"系统配置: {interaction.user} 设置了验证系统 - 审核频道:{审核频道.name} 验证身份组:{验证身份组.name}{admin_info}")
+            
             embed = discord.Embed(
                 title='✅ 设置成功',
                 description='验证系统配置已完成！',
@@ -89,10 +119,11 @@ class VerificationCommands(commands.Cog):
             embed.add_field(name='🎖️ 验证身份组', value=验证身份组.mention, inline=False)
             if 管理员身份组:
                 embed.add_field(name='👑 管理员身份组', value=管理员身份组.mention, inline=False)
-            embed.add_field(name='📝 下一步', value='使用 `/验证面板` 命令创建验证面板', inline=False)
+            embed.add_field(name='📝 下一步', value='使用 `/验证面板 频道:#channel` 命令创建验证面板', inline=False)
             
             await interaction.response.send_message(embed=embed)
         else:
+            logger.error(f"配置保存失败: 用户 {interaction.user} 的配置保存失败")
             await interaction.response.send_message('❌ 保存配置失败！请稍后重试。', ephemeral=True)
     
     @app_commands.command(name="配置", description="查看或修改当前服务器的验证配置")
