@@ -1,4 +1,5 @@
 import configparser
+import os
 from data_manager import DataManager
 from typing import Optional, List
 
@@ -6,14 +7,52 @@ class ConfigManager:
     def __init__(self, config_path: str = 'config.cfg'):
         self.config_path = config_path
         self.config = configparser.ConfigParser()
+        
+        # 检查配置文件是否存在，不存在则创建默认配置
+        if not os.path.exists(config_path):
+            self.create_default_config()
+        
         self.config.read(config_path, encoding='utf-8')
         
         # 数据管理器
         self.data_manager = DataManager()
     
+    def create_default_config(self):
+        """创建默认配置文件"""
+        default_config = """[bot]
+token=YOUR_BOT_TOKEN_HERE
+description=Discord验证机器人
+activity_type=playing
+activity_name=验证管理
+
+[database]
+# 数据库文件路径
+db_path=verification.db
+
+[default_settings]
+# 默认配置 - 可通过斜杠命令修改
+review_channel_id=
+verified_role_id=
+admin_role_ids=
+"""
+        
+        with open(self.config_path, 'w', encoding='utf-8') as f:
+            f.write(default_config)
+        
+        print(f"✅ 已创建默认配置文件: {self.config_path}")
+        print("⚠️  请编辑配置文件并填入你的机器人Token!")
+    
     def get_bot_token(self) -> str:
         """获取机器人令牌"""
-        return self.config['bot']['token']
+        token = self.config['bot']['token']
+        if token == 'YOUR_BOT_TOKEN_HERE':
+            print("❌ 请先在 config.cfg 文件中设置你的机器人Token!")
+            print("💡 获取Token步骤:")
+            print("   1. 访问 https://discord.com/developers/applications/")
+            print("   2. 选择你的应用 > Bot > Token")
+            print("   3. 复制Token并粘贴到 config.cfg 文件中")
+            exit(1)
+        return token
     
     def get_bot_description(self) -> str:
         """获取机器人描述"""
