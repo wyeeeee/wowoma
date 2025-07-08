@@ -73,7 +73,7 @@ class VerificationModal(discord.ui.Modal):
 
 class ReviewView(discord.ui.View):
     def __init__(self, config_manager, bot, user_id: int):
-        super().__init__(timeout=300)  # 5分钟超时，不持久化
+        super().__init__(timeout=None)  # 无超时，持久化
         self.config_manager = config_manager
         self.bot = bot
         self.user_id = user_id
