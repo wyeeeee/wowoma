@@ -134,6 +134,14 @@ class ReviewView(discord.ui.View):
             except discord.Forbidden:
                 logger.warning(f"无法向用户 {user} 发送私信，可能关闭了私信功能")
             
+            # 获取原始申请原因
+            original_embed = interaction.message.embeds[0]
+            application_reason = None
+            for field in original_embed.fields:
+                if field.name == '申请原因':
+                    application_reason = field.value
+                    break
+            
             # 更新审核消息
             embed = discord.Embed(
                 title='✅ 验证申请已通过',
@@ -141,6 +149,8 @@ class ReviewView(discord.ui.View):
                 color=discord.Color.green(),
                 timestamp=datetime.now()
             )
+            if application_reason:
+                embed.add_field(name='申请原因', value=application_reason, inline=False)
             embed.add_field(name='审核者', value=interaction.user.mention, inline=True)
             embed.add_field(name='分配身份组', value=verified_role.name, inline=True)
             
@@ -163,6 +173,14 @@ class ReviewView(discord.ui.View):
         
         logger.info(f"审核拒绝: 用户 {self.user_id} 的申请被 {interaction.user} 拒绝")
         
+        # 获取原始申请原因
+        original_embed = interaction.message.embeds[0]
+        application_reason = None
+        for field in original_embed.fields:
+            if field.name == '申请原因':
+                application_reason = field.value
+                break
+        
         # 更新审核消息
         embed = discord.Embed(
             title='❌ 验证申请已拒绝',
@@ -170,6 +188,8 @@ class ReviewView(discord.ui.View):
             color=discord.Color.red(),
             timestamp=datetime.now()
         )
+        if application_reason:
+            embed.add_field(name='申请原因', value=application_reason, inline=False)
         embed.add_field(name='审核者', value=interaction.user.mention, inline=True)
         
         await interaction.response.edit_message(embed=embed, view=None)
